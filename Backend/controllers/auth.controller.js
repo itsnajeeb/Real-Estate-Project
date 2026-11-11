@@ -5,6 +5,7 @@ import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+
 const escapeHtml = (value = "") => {
 
     return String(value).replace(/[&<>"']/g, (char) => ({
@@ -16,6 +17,7 @@ const escapeHtml = (value = "") => {
     })[char]);
 };
 
+// User Register
 export const register = async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
@@ -279,9 +281,7 @@ export const login = async (req, res) => {
 };
 
 
-
 // Get Logged-in User Profile
-
 export const getMe = async (req, res) => {
     try {
         // Find logged-in user
@@ -319,8 +319,6 @@ export const getMe = async (req, res) => {
         });
     }
 };
-
-
 
 
 // Verify Email
@@ -450,7 +448,7 @@ export const forgotPassword = async (req, res) => {
             .update(resetToken)
             .digest("hex");
 
-        // 5. Set token expiration (15 minutes)
+        //  Set token expiration (15 minutes)
         user.resetPasswordToken = hashedToken;
         user.resetPasswordExpire = new Date(
             Date.now() + 15 * 60 * 1000
