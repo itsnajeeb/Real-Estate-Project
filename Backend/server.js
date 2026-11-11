@@ -4,6 +4,7 @@ import http from 'http'
 
 import 'dotenv/config'
 import connectDB from "./config/db.js";
+import authRouter from "./routes/auth.route.js";
 
 const app = express()
 
@@ -16,9 +17,13 @@ connectDB()
 // Middleware
 app.use(cors())
 app.use(express.json())
-
+app.use(express.urlencoded({ extended: true }));
 
 // Routes
+
+app.use('/api/auth',authRouter)
+
+
 app.get('/', (req, res) => {
     res.send("API Working....")
 })

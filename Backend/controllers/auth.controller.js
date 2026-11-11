@@ -4,7 +4,6 @@ import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail.js";
 import jwt from "jsonwebtoken";
-import crypto from "crypto";
 
 const escapeHtml = (value = "") => {
 
@@ -22,7 +21,7 @@ export const register = async (req, res) => {
     try {
         const { name, email, password, role } = req.body;
 
-        // 1. Validate input
+        // Validate input
         if (!name || !email || !password) {
             return res.status(400).json({
                 success: false,
@@ -40,16 +39,16 @@ export const register = async (req, res) => {
         // 2. Allow only buyer and seller registration
         const userRole = role || "buyer";
 
-        if (!["buyer", "seller"].includes(userRole)) {
-            return res.status(400).json({
-                success: false,
-                message: "Invalid registration role. Admin Can't Registerd",
-            });
-        }
+        // if (!["buyer", "seller"].includes(userRole)) {
+        //     return res.status(400).json({
+        //         success: false,
+        //         message: "Invalid registration role. Admin Can't Registerd",
+        //     });
+        // }
 
         const normalizedEmail = email.trim().toLowerCase();
 
-        // 3. Check existing user
+        // Check existing user
         const userExist = await User.findOne({
             email: normalizedEmail,
         });
@@ -61,10 +60,10 @@ export const register = async (req, res) => {
             });
         }
 
-        // 4. Hash password
+        // Hash password
         const hashPassword = await bcrypt.hash(password, 12);
 
-        // 5. Generate 6-digit OTP
+        // Generate 6-digit OTP
         const verificationToken = crypto
             .randomInt(100000, 1000000)
             .toString();
@@ -74,7 +73,7 @@ export const register = async (req, res) => {
             Date.now() + 15 * 60 * 1000
         );
 
-        // 6. Create user
+        // Create user
         const user = await User.create({
             name: name.trim(),
             email: normalizedEmail,
@@ -89,7 +88,7 @@ export const register = async (req, res) => {
             verificationTokenExpire,
         });
 
-        // 7. Send verification email
+        // Send verification email
         try {
             await sendEmail({
                 email: user.email,
@@ -130,7 +129,7 @@ export const register = async (req, res) => {
             });
         }
 
-        // 8. Success response
+        // Success response
         return res.status(200).json({
             success: true,
             message: "Registration successful. Please verify your email.",
@@ -167,7 +166,7 @@ export const login = async (req, res) => {
     try {
         const { email, password } = req.body;
 
-        // 1. Validate input
+        // Validate input
         if (!email || !password) {
             return res.status(400).json({
                 success: false,
@@ -177,7 +176,7 @@ export const login = async (req, res) => {
 
         const normalizedEmail = email.trim().toLowerCase();
 
-        // 2. Find user and explicitly select password
+        // Find user and explicitly select password
         const user = await User.findOne({
             email: normalizedEmail,
         }).select("+password");
@@ -189,7 +188,7 @@ export const login = async (req, res) => {
             });
         }
 
-        // 3. Check password
+        // Check password
         const isMatch = await bcrypt.compare(
             password,
             user.password
@@ -202,7 +201,7 @@ export const login = async (req, res) => {
             });
         }
 
-        // 4. Check blocked account
+        // Check blocked account
         if (user.isBlocked) {
             return res.status(403).json({
                 success: false,
@@ -210,7 +209,7 @@ export const login = async (req, res) => {
             });
         }
 
-        // 5. Check email verification
+        // Check email verification
         if (!user.isVerified) {
             return res.status(403).json({
                 success: false,
@@ -219,7 +218,7 @@ export const login = async (req, res) => {
             });
         }
 
-        // 6. Check seller approval
+        // Check seller approval
         if (user.role === "seller" && !user.isApproved) {
             return res.status(403).json({
                 success: false,
@@ -228,12 +227,12 @@ export const login = async (req, res) => {
             });
         }
 
-        // 7. Check JWT secret
+        // Check JWT secret
         if (!process.env.JWT_SECRET) {
             throw new Error("JWT_SECRET is missing in environment variables");
         }
 
-        // 8. Generate JWT token
+        // Generate JWT token
         const token = jwt.sign(
             {
                 id: user._id,
@@ -245,11 +244,11 @@ export const login = async (req, res) => {
             }
         );
 
-        // 9. Update last login
+        // Update last login
         user.lastLogin = new Date();
         await user.save();
 
-        // 10. Safe user response
+        // Safe user response
         const userData = {
             _id: user._id,
             name: user.name,
@@ -262,7 +261,7 @@ export const login = async (req, res) => {
             isApproved: user.isApproved,
         };
 
-        // 11. Send response
+        //  Send response
         return res.status(200).json({
             success: true,
             message: "Logged in successfully",
@@ -326,7 +325,7 @@ export const verifyEmail = async (req, res) => {
     try {
         const { email, code } = req.body;
 
-        // 1. Validate input
+        // Validate input
         if (!email || !code) {
             return res.status(400).json({
                 success: false,
@@ -336,7 +335,7 @@ export const verifyEmail = async (req, res) => {
 
         const normalizedEmail = email.trim().toLowerCase();
 
-        // 2. Find user and retrieve hidden verification fields
+        // Find user and retrieve hidden verification fields
         const user = await User.findOne({
             email: normalizedEmail,
         }).select(
@@ -350,7 +349,7 @@ export const verifyEmail = async (req, res) => {
             });
         }
 
-        // 3. Check already verified
+        // Check already verified
         if (user.isVerified) {
             return res.status(400).json({
                 success: false,
@@ -358,7 +357,7 @@ export const verifyEmail = async (req, res) => {
             });
         }
 
-        // 4. Check OTP existence
+        // Check OTP existence
         if (!user.verificationToken || !user.verificationTokenExpire) {
             return res.status(400).json({
                 success: false,
@@ -366,7 +365,7 @@ export const verifyEmail = async (req, res) => {
             });
         }
 
-        // 5. Check OTP expiration
+        // Check OTP expiration
         if (user.verificationTokenExpire.getTime() < Date.now()) {
             return res.status(400).json({
                 success: false,
@@ -374,7 +373,7 @@ export const verifyEmail = async (req, res) => {
             });
         }
 
-        // 6. Check OTP
+        // Check OTP
         if (String(user.verificationToken) !== String(code).trim()) {
             return res.status(400).json({
                 success: false,
@@ -382,7 +381,7 @@ export const verifyEmail = async (req, res) => {
             });
         }
 
-        // 7. Verify email
+        //  Verify email
         user.isVerified = true;
 
         // Clear verification data
@@ -391,7 +390,7 @@ export const verifyEmail = async (req, res) => {
 
         await user.save();
 
-        // 8. Success response
+        //  Success response
         return res.status(200).json({
             success: true,
             message: "Email verified successfully. You can now log in.",
