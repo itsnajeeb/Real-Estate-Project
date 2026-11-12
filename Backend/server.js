@@ -6,6 +6,7 @@ import 'dotenv/config'
 import connectDB from "./config/db.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.routes.js";
+import propertyRouter from "./routes/property.route.js";
 
 const app = express()
 
@@ -22,8 +23,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 
-app.use('/api/auth',authRouter)
-app.use('/api/user',userRouter)
+app.use('/api/auth', authRouter);
+app.use('/api/user', userRouter);
+app.use('/api/property', propertyRouter)
+
 
 app.get('/', (req, res) => {
     res.send("API Working....")
@@ -31,7 +34,7 @@ app.get('/', (req, res) => {
 
 const server = http.createServer(app);
 
-server.listen(PORT, ()=>{
+server.listen(PORT, () => {
     console.log(`Server Stated on http://localhost:${PORT}`)
 })
 

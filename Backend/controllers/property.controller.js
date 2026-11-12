@@ -1,9 +1,10 @@
 
 import Property from "../models/property.model.js";
-import Inquiry from "../models/Inquiry.model.js";
+import Inquiry from "../models/Inquary.model.js";
 import { uploadToCloudinary } from "../utils/uploadCloudinary.js";
-import mongoose from "mongoose";
 import cloudinary from "../config/cloudinary.js";
+import mongoose from "mongoose";
+import jwt from 'jsonwebtoken';
 
 // ADD A PROPERTY
 export const addProperty = async (req, res) => {
@@ -464,6 +465,428 @@ export const updatePropertiesStatus = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: error.message || "Internal server error",
+        });
+    }
+};
+
+
+
+// GET ALL PROPERTIES WITH FILTERS
+export const getAllProperties = async (req, res) => {
+    try {
+        const {
+            city,
+            area,
+            pincode,
+            propertyType,
+            bhk,
+            furnishing,
+            status,
+            minPrice,
+            maxPrice,
+            amenities,
+            sort,
+            seller,
+            page = 1,
+            limit = 12,
+        } = req.query;
+
+        // Escape special regex characters
+        const escapeRegex = (value) =>
+            value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+        // Base query
+        const query = {
+            status: status || "sale",
+        };
+
+        // Seller filter
+        if (seller) {
+            if (!mongoose.Types.ObjectId.isValid(seller)) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid seller ID",
+                });
+            }
+
+            query.seller = seller;
+        }
+
+        // City filter
+        if (city) {
+            query.city = new RegExp(escapeRegex(city.trim()), "i");
+        }
+
+        // Area filter
+        if (area) {
+            query.area = new RegExp(escapeRegex(area.trim()), "i");
+        }
+
+        // Pincode filter
+        if (pincode) {
+            query.pincode = pincode.trim();
+        }
+
+        // Property type filter
+        if (propertyType) {
+            const types = propertyType
+                .split(",")
+                .map((type) => type.trim())
+                .filter(Boolean);
+
+            if (types.length) {
+                query.propertyType = {
+                    $in: types.map(
+                        (type) => new RegExp(`^${escapeRegex(type)}$`, "i")
+                    ),
+                };
+            }
+        }
+
+        // BHK filter
+        if (bhk) {
+            if (bhk === "5+") {
+                // Your addProperty controller stores BHK as a string
+                query.bhk = {
+                    $regex: /^(5\+|[5-9]\d*)$/,
+                };
+            } else {
+                query.bhk = String(bhk);
+            }
+        }
+
+        // Furnishing filter
+        if (furnishing) {
+            const furnishingArray = furnishing
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+
+            query.furnishing = {
+                $in: furnishingArray.map(
+                    (item) => new RegExp(`^${escapeRegex(item)}$`, "i")
+                ),
+            };
+        }
+
+        // Price filter
+        if (minPrice !== undefined || maxPrice !== undefined) {
+            const min = minPrice !== undefined ? Number(minPrice) : undefined;
+            const max = maxPrice !== undefined ? Number(maxPrice) : undefined;
+
+            if (
+                (min !== undefined && (!Number.isFinite(min) || min < 0)) ||
+                (max !== undefined && (!Number.isFinite(max) || max < 0))
+            ) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Invalid price range",
+                });
+            }
+
+            if (min !== undefined && max !== undefined && min > max) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Minimum price cannot exceed maximum price",
+                });
+            }
+
+            query.price = {};
+
+            if (min !== undefined) query.price.$gte = min;
+            if (max !== undefined) query.price.$lte = max;
+        }
+
+        // Amenities filter
+        if (amenities) {
+            const amenitiesArray = amenities
+                .split(",")
+                .map((item) => item.trim())
+                .filter(Boolean);
+
+            if (amenitiesArray.length) {
+                query.amenities = {
+                    $in: amenitiesArray,
+                };
+            }
+        }
+
+        // Sorting
+        let sortOption = { createdAt: -1 };
+
+        switch (sort) {
+            case "priceLow":
+                sortOption = { price: 1 };
+                break;
+
+            case "priceHigh":
+                sortOption = { price: -1 };
+                break;
+
+            case "latest":
+                sortOption = { createdAt: -1 };
+                break;
+        }
+
+        // Pagination
+        const currentPage = Math.max(1, Number(page) || 1);
+        const pageLimit = Math.min(50, Math.max(1, Number(limit) || 12));
+
+        const skip = (currentPage - 1) * pageLimit;
+
+        // Fetch properties and total count
+        const [properties, totalProperties] = await Promise.all([
+            Property.find(query)
+                .populate("seller", "name phone profilePic")
+                .sort(sortOption)
+                .skip(skip)
+                .limit(pageLimit)
+                .lean(),
+
+            Property.countDocuments(query),
+        ]);
+
+        return res.status(200).json({
+            success: true,
+            count: properties.length,
+            totalProperties,
+            totalPages: Math.ceil(totalProperties / pageLimit),
+            currentPage,
+            properties,
+        });
+
+    } catch (error) {
+        console.error("GET_ALL_PROPERTIES_ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error while fetching properties",
+        });
+    }
+};
+
+
+
+// GET PROPERTY DETAILS
+export const getPropertyDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Validate property ID
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                success: false,
+                message: "Invalid property ID",
+            });
+        }
+
+        // Fetch property details
+        const property = await Property.findById(id)
+            .populate("seller", "name phone profilePic");
+
+        if (!property) {
+            return res.status(404).json({
+                success: false,
+                message: "Property not found",
+            });
+        }
+
+        // Identify visitor
+        let visitorId = req.ip;
+
+        // Check authentication token
+        const authHeader = req.headers.authorization;
+
+        if (authHeader?.startsWith("Bearer ")) {
+            try {
+                const token = authHeader.split(" ")[1];
+
+                const decoded = jwt.verify(
+                    token,
+                    process.env.JWT_SECRET
+                );
+
+                visitorId = decoded.id;
+
+            } catch (error) {
+                // Invalid token: continue as guest
+            }
+        }
+
+        // Check whether seller is viewing own property
+        const sellerId = property.seller?._id?.toString();
+
+        const isSellerChecking =
+            sellerId && visitorId === sellerId;
+
+        // Track unique views atomically
+        if (!isSellerChecking && visitorId) {
+            const updatedProperty = await Property.findOneAndUpdate(
+                {
+                    _id: id,
+                    viewedBy: { $ne: visitorId },
+                },
+                {
+                    $addToSet: { viewedBy: visitorId },
+                    $inc: { views: 1 },
+                },
+                {
+                    new: true,
+                }
+            );
+
+            // Update response object if view was counted
+            if (updatedProperty) {
+                property.views = updatedProperty.views;
+            }
+        }
+
+        // Find similar properties
+        const similarProperties = await Property.find({
+            _id: { $ne: property._id },
+            city: property.city,
+            propertyType: property.propertyType,
+            status: property.status,
+        })
+            .sort({ createdAt: -1 })
+            .limit(4)
+            .select(
+                "title price images city area propertyType bhk areaSize status"
+            )
+            .lean();
+
+        return res.status(200).json({
+            success: true,
+            property,
+            similarProperties,
+        });
+
+    } catch (error) {
+        console.error("GET_PROPERTY_DETAILS_ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error while fetching property details",
+        });
+    }
+};
+
+
+// SELLER DASHBOARD
+export const getSellerDashboard = async (req, res) => {
+    try {
+        const sellerId = req.user._id;
+
+        // Run all queries simultaneously
+        const [
+            totalProperties,
+            activeListings,
+            soldProperties,
+            totalInquiries,
+            viewsData,
+        ] = await Promise.all([
+
+            // Total properties
+            Property.countDocuments({
+                seller: sellerId,
+            }),
+
+            // Active listings
+            Property.countDocuments({
+                seller: sellerId,
+                status: "available",
+            }),
+
+            // Sold properties
+            Property.countDocuments({
+                seller: sellerId,
+                status: "sold",
+            }),
+
+            // Total inquiries
+            Inquiry.countDocuments({
+                seller: sellerId,
+            }),
+
+            // Total property views
+            Property.aggregate([
+                {
+                    $match: {
+                        seller: sellerId,
+                    },
+                },
+                {
+                    $group: {
+                        _id: null,
+                        totalViews: {
+                            $sum: {
+                                $ifNull: ["$views", 0],
+                            },
+                        },
+                    },
+                },
+            ]),
+        ]);
+
+        const totalViews = viewsData[0]?.totalViews || 0;
+
+        return res.status(200).json({
+            success: true,
+            message: "Seller dashboard data fetched successfully",
+            stats: {
+                totalProperties,
+                activeListings,
+                soldProperties,
+                totalInquiries,
+                totalViews,
+            },
+        });
+
+    } catch (error) {
+        console.error("GET_SELLER_DASHBOARD_ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error while fetching seller dashboard",
+        });
+    }
+};
+
+
+// GET PROPERTY COUNTS BY TYPE
+export const getPropertyCounts = async (req, res) => {
+    try {
+        const counts = await Property.aggregate([
+            {
+                $match: {
+                    status: "sale",
+                },
+            },
+            {
+                $group: {
+                    _id: "$propertyType",
+                    count: { $sum: 1 },
+                },
+            },
+        ]);
+
+        // Format counts into an object
+        const formattedCounts = counts.reduce((acc, curr) => {
+            acc[curr._id] = curr.count;
+            return acc;
+        }, {});
+
+        return res.status(200).json({
+            success: true,
+            counts: formattedCounts,
+        });
+
+    } catch (error) {
+        console.error("GET_PROPERTY_COUNTS_ERROR:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error while fetching property counts",
         });
     }
 };
