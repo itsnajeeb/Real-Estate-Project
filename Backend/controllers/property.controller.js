@@ -1,6 +1,6 @@
 
 import Property from "../models/property.model.js";
-import Inquiry from "../models/Inquary.model.js";
+import Inquiry from "../models/inquiry.model.js";
 import { uploadToCloudinary } from "../utils/uploadCloudinary.js";
 import cloudinary from "../config/cloudinary.js";
 import mongoose from "mongoose";

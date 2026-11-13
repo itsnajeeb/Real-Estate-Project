@@ -1,10 +1,10 @@
 import mongoose from "mongoose";
 
-const InquarySchema = new mongoose.Schema({
+const InquirySchema = new mongoose.Schema({
 
     property: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "Propery",
+        ref: "Property",
         required: true
     },
 
@@ -32,7 +32,7 @@ const InquarySchema = new mongoose.Schema({
 },{ timestamps: true });
 
 
-const Inquary = mongoose.model("Inquary", InquarySchema)
+const Inquiry = mongoose.model("Inquiry", InquirySchema)
 
 
-export default Inquary;
+export default Inquiry;

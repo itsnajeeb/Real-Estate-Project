@@ -7,6 +7,7 @@ import connectDB from "./config/db.js";
 import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.routes.js";
 import propertyRouter from "./routes/property.route.js";
+import inquiryRouter from "./routes/inquiry.route.js";
 
 const app = express()
 
@@ -22,10 +23,10 @@ app.use(express.json())
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
-
 app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/property', propertyRouter)
+app.use("/api/inquiry", inquiryRouter)
 
 
 app.get('/', (req, res) => {
