@@ -8,6 +8,7 @@ import authRouter from "./routes/auth.route.js";
 import userRouter from "./routes/user.routes.js";
 import propertyRouter from "./routes/property.route.js";
 import inquiryRouter from "./routes/inquiry.route.js";
+import wishlistRouter from "./routes/wishlisht.route.js";
 
 const app = express()
 
@@ -27,6 +28,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/user', userRouter);
 app.use('/api/property', propertyRouter)
 app.use("/api/inquiry", inquiryRouter)
+app.use("/api/wishlist", wishlistRouter)
 
 
 app.get('/', (req, res) => {
